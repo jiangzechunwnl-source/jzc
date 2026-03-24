@@ -1,0 +1,13 @@
+TTMS Web 相关目录（与 run_web.bat 同层）
+
+  index.html      — 前端页面
+  TTMS_Web.exe    — 编译生成后运行
+  web_server.c    — C 后端源码
+  run_web.bat     — 编译并启动 Web
+  data.txt        — 与控制台 TTMS 共用的数据文件
+
+  static/         — 图片等静态资源（见 static\README.txt）
+
+内置管理员（仅 Web 登录用，不写入 data.txt）：
+  用户名：admin
+  密码：  admin
