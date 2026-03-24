@@ -1,0 +1,161 @@
+================================================================================
+            [S] 演出厅管理 - 任务实现对照表（功能与文件对应）
+================================================================================
+  新内容实现顺序：①RoomInit先删旧座位+SEAT_NONE → ②剩余显示逻辑 → ③studio_remain_count
+  → ④Seat_UI_Add空位改有座位 → ⑤Data_Studio_CompactIDs → ⑥DeleteByID调用紧凑
+  → ⑦Studio_UI_Delete先删座位 → ⑧Data_Seat_CompactIDs → ⑨⑩座位删除调用紧凑 → ⑪ID紧凑整节
+--------------------------------------------------------------------------------
+
+一、入口
+--------------------------------------------------------------------------------
+  功能              对应函数                    文件路径
+--------------------------------------------------------------------------------
+  主选单 [S] 选项   Studio_UI_MgtEntry()         src/View/Main_Menu.c 第26-27行
+
+
+二、演出厅界面 (Studio UI)
+--------------------------------------------------------------------------------
+  功能              对应函数                    文件路径
+--------------------------------------------------------------------------------
+  管理入口          Studio_UI_MgtEntry() ②(此内容为新内容)        src/View/Studio_UI.c
+  新增界面          Studio_UI_Add()              src/View/Studio_UI.c
+  修改界面          Studio_UI_Modify()           src/View/Studio_UI.c
+  删除界面          Studio_UI_Delete() ⑦(此内容为新内容)           src/View/Studio_UI.c
+  剩余座位统计      studio_remain_count() ③(此内容为新内容)        src/View/Studio_UI.c
+  分页显示          Paging_ViewPage_ForEach 等   src/Common/List.h
+
+  头文件：src/View/Studio_UI.h
+
+
+三、座位管理 (Seat UI)（[S] 选座位后进入）
+--------------------------------------------------------------------------------
+  功能              对应函数                    文件路径
+--------------------------------------------------------------------------------
+  管理入口          Seat_UI_MgtEntry() ②(此内容为新内容)           src/View/Seat_UI.c
+  新增界面          Seat_UI_Add() ④(此内容为新内容)                src/View/Seat_UI.c
+  修改界面          Seat_UI_Modify()             src/View/Seat_UI.c
+  删除界面          Seat_UI_Delete()             src/View/Seat_UI.c
+  状态转字符        Seat_UI_Status2Char()        src/View/Seat_UI.c
+  字符转状态        Seat_UI_Char2Status()        src/View/Seat_UI.c
+
+  头文件：src/View/Seat_UI.h
+
+
+四、演出厅服务 (Studio Service)
+--------------------------------------------------------------------------------
+  功能              对应函数                    文件路径
+--------------------------------------------------------------------------------
+  全量获取          Studio_Srv_FetchAll()        src/Service/Studio.c
+  新增演出厅        Studio_Srv_Add()             src/Service/Studio.c
+  修改演出厅        Studio_Srv_Modify()         src/Service/Studio.c
+  按ID删除          Studio_Srv_DeleteByID()      src/Service/Studio.c
+  按ID查询          Studio_Srv_FetchByID()       src/Service/Studio.c
+  链表查找          Studio_Srv_FindByID()        src/Service/Studio.c
+
+  头文件：src/Service/Studio.h
+
+
+五、座位服务 (Seat Service)
+--------------------------------------------------------------------------------
+  功能              对应函数                    文件路径
+--------------------------------------------------------------------------------
+  座位初始化        Seat_Srv_RoomInit() ①(此内容为新内容)          src/Service/Seat.c
+  座位增            Seat_Srv_Add()               src/Service/Seat.c
+  座位删            Seat_Srv_DeleteByID()        src/Service/Seat.c
+  按房间ID删除      Seat_Srv_DeleteAllByRoomID() src/Service/Seat.c
+  座位改            Seat_Srv_Modify()            src/Service/Seat.c
+  座位查            Seat_Srv_FetchByID()         src/Service/Seat.c
+  按房间ID查询      Seat_Srv_FetchByRoomID()     src/Service/Seat.c
+  按行列查找        Seat_Srv_FindByRowCol()      src/Service/Seat.c
+  按ID查找          Seat_Srv_FindByID()          src/Service/Seat.c
+  获取有效座位      Seat_Srv_FetchValidByRoomID() src/Service/Seat.c
+  批量添加          Seat_Srv_AddBatch()          src/Service/Seat.c
+  座位排序          Seat_Srv_SortSeatList()      src/Service/Seat.c
+  加入已排序链表    Seat_Srv_AddToSoftedList()   src/Service/Seat.c
+
+  头文件：src/Service/Seat.h
+
+
+六、演出厅 DAO (Studio Persist)
+--------------------------------------------------------------------------------
+  功能              对应函数                    文件路径
+--------------------------------------------------------------------------------
+  插入              Studio_Perst_Insert()        src/Persistence/Studio_Persist.c
+  更新              Studio_Perst_Update()        src/Persistence/Studio_Persist.c
+  按ID查询          Studio_Perst_SelectByID()   src/Persistence/Studio_Persist.c
+  全量查询          Studio_Perst_SelectAll()    src/Persistence/Studio_Persist.c
+  删除              Studio_Perst_DeleteByID()   src/Persistence/Studio_Persist.c
+
+  头文件：src/Persistence/Studio_Persist.h
+
+
+七、座位 DAO (Seat Persist)
+--------------------------------------------------------------------------------
+  功能              对应函数                    文件路径
+--------------------------------------------------------------------------------
+  单条插入          Seat_Perst_Insert()          src/Persistence/Seat_Persist.c
+  批量插入          Seat_Perst_InsertBatch()     src/Persistence/Seat_Persist.c
+  更新              Seat_Perst_Update()          src/Persistence/Seat_Persist.c
+  按ID删除          Seat_Perst_DeleteByID()      src/Persistence/Seat_Persist.c
+  按房间ID删除      Seat_Perst_DeleteAllByRoomID() src/Persistence/Seat_Persist.c
+  按ID查询          Seat_Perst_SelectByID()     src/Persistence/Seat_Persist.c
+  全量查询          Seat_Perst_SelectAll()      src/Persistence/Seat_Persist.c
+  按房间查询        Seat_Perst_SelectByRoomID() src/Persistence/Seat_Persist.c
+
+  头文件：src/Persistence/Seat_Persist.h
+
+
+八、Data_Store 层（演出厅与座位相关）
+--------------------------------------------------------------------------------
+  功能              对应函数                    文件路径
+--------------------------------------------------------------------------------
+  数据加载/保存     Data_Load() / Data_Save()    src/Persistence/Data_Store.c
+  演出厅 CRUD       Data_Studio_Insert/Update/   src/Persistence/Data_Store.c
+                   DeleteByID⑥(此内容为新内容)/SelectByID/SelectAll
+  演出厅 ID 紧凑    Data_Studio_CompactIDs() ⑤(此内容为新内容)    src/Persistence/Data_Store.c
+  座位 CRUD         Data_Seat_Insert/InsertBatch/ src/Persistence/Data_Store.c
+                   Update/DeleteByID⑨(此内容为新内容)/DeleteAllByRoomID⑩(此内容为新内容)/
+                   SelectByID/SelectByRoomID
+  座位 ID 紧凑     Data_Seat_CompactIDs() ⑧(此内容为新内容)       src/Persistence/Data_Store.c
+
+  头文件：src/Persistence/Data_Store.h
+
+
+九、数据文件格式（[S] 相关）
+--------------------------------------------------------------------------------
+  [Studio]  id|名称|行数|列数|座位数
+  [Seat]    id|演出厅ID|行|列|状态
+
+
+十、ID 自动紧凑（[S] 相关实体）⑪(此内容为新内容)
+--------------------------------------------------------------------------------
+  实体      紧凑时机                    关联更新
+--------------------------------------------------------------------------------
+  Studio    载入、删除后                Seat.roomID, Schedule.studioID
+  Seat      载入、删除后、DeleteAllByRoomID 后  Ticket.seatID
+
+
+十一、呼叫关系
+--------------------------------------------------------------------------------
+  Main_Menu [S] → Studio_UI_MgtEntry()
+  Studio_UI [S]座位 → Seat_UI_MgtEntry(roomID)
+  主键分配  EntityKey_Persist / Data_Store
+  链表分页  src/Common/List.h
+
+
+十二、相关文件目录
+--------------------------------------------------------------------------------
+  src/View/Main_Menu.c         主选单（呼叫 Studio_UI_MgtEntry）
+  src/View/Studio_UI.c/h       演出厅界面
+  src/View/Seat_UI.c/h         座位界面
+  src/View/UI_Common.h         界面通用样式
+  src/Service/Studio.c/h       演出厅服务
+  src/Service/Seat.c/h        座位服务
+  src/Persistence/Studio_Persist.c/h
+  src/Persistence/Seat_Persist.c/h
+  src/Persistence/Data_Store.c/h
+  src/Persistence/EntityKey_Persist.c/h
+  src/Common/List.h            链表、分页宏
+
+
+================================================================================

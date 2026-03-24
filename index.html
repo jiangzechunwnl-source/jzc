@@ -1,0 +1,1418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>剧院票务管理系统 - TTMS</title>
+    <!-- 字体：Google Fonts；页面逻辑在底部 script，接口为同源 /api/*，静态资源用 /static/* -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* 主题色与间距变量，供全文复用 */
+        :root {
+            --bg-dark: #0f0e14;
+            --bg-card: #1a1822;
+            --bg-hover: #24212e;
+            --accent-gold: #d4a853;
+            --accent-red: #c45c4a;
+            --accent-green: #6bc97a;
+            --text-primary: #f0ebe3;
+            --text-secondary: #9a9389;
+            --border: rgba(212, 168, 83, 0.2);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; } /* 统一盒模型 */
+        html { height: 100%; } /* 便于子元素百分比高度 */
+        body { /* 页面主体：字体、最小高度、底色 */
+            font-family: 'Noto Serif SC', serif; color: var(--text-primary);
+            min-height: 100vh;
+            min-height: 100dvh;
+            background: var(--bg-dark);
+            position: relative;
+        }
+        /* 不用 body::before + background-attachment:fixed，部分浏览器只会画出顶端一条 */
+        .page-bg { /* 全屏背景图层，图片来自 /static/background.png */
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            min-height: 100vh;
+            min-height: 100dvh;
+            z-index: 0;
+            background-color: var(--bg-dark);
+            background-image: url('/static/background.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        .page-bg-vignette { /* 暗角渐变，叠在背景图之上 */
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            min-height: 100vh;
+            min-height: 100dvh;
+            z-index: 0;
+            background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(212, 168, 83, 0.08) 0%, transparent 50%);
+            pointer-events: none;
+        }
+        #login-screen, #register-screen { z-index: 3; }
+        .container { position: relative; z-index: 1; max-width: 1000px; margin: 0 auto; padding: 1.5rem; min-height: 100vh; min-height: 100dvh; }
+        header { text-align: center; margin-bottom: 1.5rem; }
+        .logo { font-size: 1.5rem; font-weight: 700; letter-spacing: 0.2em; color: var(--accent-gold); }
+        .subtitle { font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem; }
+        /* align-items:start 避免整行被拉高后内层 flex 把图片裁成半张 */
+        .menu-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; margin-bottom: 1.5rem; align-items: start; } /* 主菜单四列网格 */
+        .menu-item { /* 单个菜单卡片：链接样式 */
+            background: rgba(26, 24, 34, 0.85); border: 1px solid var(--border); border-radius: 12px;
+            padding: 0.75rem; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column;
+            align-items: center; text-align: center; color: inherit; text-decoration: none;
+            overflow: visible;
+            min-width: 0;
+        }
+        .menu-item:hover { border-color: var(--accent-gold); transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+        .menu-item.active { border-color: var(--accent-gold); background: rgba(36, 33, 46, 0.9); }
+        .menu-item img {
+            display: block;
+            flex-shrink: 0;
+            width: auto;
+            max-width: 120px;
+            height: auto;
+            max-height: none;
+            border-radius: 8px;
+            object-fit: contain;
+            vertical-align: bottom;
+        }
+        .menu-item .label { margin-top: 0.5rem; font-size: 0.85rem; font-weight: 500; }
+        .panel { display: none; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; min-height: 200px; }
+        .panel.show { display: block; }
+        .panel h3 { margin-bottom: 1rem; color: var(--accent-gold); font-size: 1.1rem; }
+        .panel table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        .panel th, .panel td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border); }
+        .panel th { color: var(--text-secondary); font-weight: 500; }
+        .panel .msg { padding: 0.5rem; }
+        .panel .msg.ok { color: var(--accent-green); }
+        .panel .msg.err { color: var(--accent-red); }
+        .panel .form-row { margin-bottom: 0.75rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+        .panel input, .panel select {
+            padding: 0.5rem 0.75rem; background: var(--bg-dark); border: 1px solid var(--border);
+            border-radius: 6px; color: var(--text-primary); font-size: 0.9rem;
+        }
+        .panel button {
+            padding: 0.5rem 1rem; background: var(--accent-gold); border: none; border-radius: 6px;
+            color: var(--bg-dark); font-weight: 600; cursor: pointer; font-size: 0.85rem;
+        }
+        .panel button:hover { opacity: 0.9; }
+        .panel button.danger { background: var(--accent-red); }
+        .panel button.small { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
+        .seat-section { margin: 1rem 0; padding: 1rem; background: var(--bg-dark); border-radius: 8px; }
+        .seat-legend { font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem; }
+        .grid-seat {
+            display: inline-grid; gap: 3px; font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem; margin: 0.5rem 0;
+        }
+        .grid-seat span {
+            width: 2em; height: 2em; display: flex; align-items: center; justify-content: center;
+            border-radius: 4px; cursor: pointer; border: 1px solid transparent;
+        }
+        .grid-seat span.sell { color: var(--accent-green); }
+        .grid-seat span.sold { color: var(--accent-red); background: rgba(196, 92, 74, 0.2); }
+        .grid-seat span.broken { color: var(--text-secondary); }
+        .grid-seat span:hover:not(.sold):not(.broken) { background: rgba(212, 168, 83, 0.2); border-color: var(--accent-gold); }
+        .grid-seat.studio-seat span { width: 2.2em; height: 2.2em; font-size: 1rem; cursor: pointer; }
+        footer { margin-top: 2rem; text-align: center; font-size: 0.75rem; color: var(--text-secondary); }
+        .crud-form { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+        @media (max-width: 768px) { .menu-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 480px) { .menu-grid { grid-template-columns: 1fr; } .menu-item img { max-width: 100px; } }
+        #login-screen {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            max-width: 360px; padding: 2rem; background: rgba(15, 14, 20, 0.92);
+            border: 1px solid var(--border); border-radius: 12px; text-align: center;
+        }
+        #login-screen h2 { color: var(--accent-gold); margin-bottom: 1.5rem; font-size: 1.2rem; }
+        #login-screen input { width: 100%; margin-bottom: 1rem; padding: 0.6rem; }
+        #login-screen button, #register-screen button {
+            padding: 0.5rem 1.25rem;
+            font-size: 0.9rem;
+            min-height: 2.5rem;
+            background: var(--accent-gold);
+            border: none;
+            border-radius: 6px;
+            color: var(--bg-dark);
+            font-weight: 600;
+            cursor: pointer;
+        }
+        #login-screen .btn-row { display: flex; gap: 0.75rem; justify-content: center; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+        #login-screen .link { color: var(--accent-gold); cursor: pointer; font-size: 0.9rem; margin-top: 0.75rem; }
+        #login-screen .link:hover { text-decoration: underline; }
+        .user-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.85rem; }
+        .user-bar .logout { color: var(--accent-red); cursor: pointer; }
+        .user-bar .logout:hover { text-decoration: underline; }
+        .secondary { background: transparent !important; color: var(--text-secondary) !important; border: 1px solid var(--border) !important; }
+        .seat-preview-wrap { text-align: center; }
+        .screen-hint { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem; padding: 0.25rem; border-bottom: 1px dashed var(--border); }
+        .schedule-by-movie-panel {
+            margin-top: 1rem; padding: 1rem; background: var(--bg-dark); border: 1px solid var(--border);
+            border-radius: 10px; display: none;
+        }
+        .schedule-by-movie-panel.show { display: block; }
+        .schedule-by-movie-panel h4 { color: var(--accent-gold); font-size: 1rem; margin-bottom: 0.75rem; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="page-bg" aria-hidden="true"></div>
+    <div class="page-bg-vignette" aria-hidden="true"></div>
+    <div id="login-screen">
+        <h2>剧院票务管理系统 · 登录</h2>
+        <p style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:0.75rem">内置管理员：<b>admin</b> / <b>admin</b>（不写数据库）</p>
+        <input type="text" id="login-username" placeholder="账户名称" autocomplete="username">
+        <input type="password" id="login-password" placeholder="密码" autocomplete="current-password">
+        <div id="login-msg" class="msg" style="min-height:1.2rem;font-size:0.85rem"></div>
+        <div class="btn-row">
+            <button onclick="doLogin()">登录</button>
+        </div>
+        <a class="link" id="go-register">没有账号？创建账户</a>
+    </div>
+    <div id="register-screen" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);max-width:360px;padding:2rem;background:rgba(15,14,20,0.92);border:1px solid var(--border);border-radius:12px;text-align:center">
+        <h2 style="color:var(--accent-gold);margin-bottom:1.5rem;font-size:1.2rem">创建账户</h2>
+        <input type="text" id="reg-username" placeholder="账户名称" autocomplete="username">
+        <input type="password" id="reg-password" placeholder="密码（至少6位）" autocomplete="new-password">
+        <input type="password" id="reg-password2" placeholder="确认密码" autocomplete="new-password">
+        <div id="reg-msg" class="msg" style="min-height:1.2rem;font-size:0.85rem"></div>
+        <div class="btn-row">
+            <button onclick="doRegister()">创建</button>
+            <button class="secondary" onclick="showLogin()">返回登录</button>
+        </div>
+    </div>
+    <div id="main-app" class="container" style="display:none">
+        <div class="user-bar">
+            <span>欢迎，<b id="current-username"></b> <span id="user-role-badge"></span></span>
+            <span class="logout" onclick="doLogout()">登出</span>
+        </div>
+        <header>
+            <h1 class="logo">剧院票务管理系统</h1>
+            <p class="subtitle">TTMS · 主菜单</p>
+        </header>
+        <nav class="menu-grid">
+            <a href="#" class="menu-item admin-only" data-key="SCH"><img src="/static/2.png" alt="场次管理"><span class="label">场次管理</span></a>
+            <a href="#" class="menu-item admin-only" data-key="S"><img src="/static/1.png" alt="影院管理"><span class="label">影院管理</span></a>
+            <a href="#" class="menu-item admin-only" data-key="P"><img src="/static/2.png" alt="剧目管理"><span class="label">剧目管理</span></a>
+            <a href="#" class="menu-item sell" data-key="T"><img src="/static/3.png" alt="售票"><span class="label">售票</span></a>
+            <a href="#" class="menu-item refund" data-key="R"><img src="/static/4.png" alt="退票"><span class="label">退票</span></a>
+            <a href="#" class="menu-item" data-key="Q"><img src="/static/5.png" alt="查询"><span class="label">查询</span></a>
+            <a href="#" class="menu-item admin-only" data-key="N"><img src="/static/6.png" alt="排行榜与统计"><span class="label">排行榜与统计</span></a>
+            <a href="#" class="menu-item admin-only" data-key="A"><img src="/static/7.png" alt="账户管理"><span class="label">账户管理</span></a>
+            <a href="#" class="menu-item admin-only" data-key="INIT"><img src="/static/8.png" alt="初始化所有数据"><span class="label">初始化所有数据</span></a>
+        </nav>
+
+        <div id="panel-SCH" class="panel">
+            <h3>场次管理 · 每部电影固定在同编号影厅播出</h3>
+            <p class="msg" style="margin-bottom:1rem;color:var(--text-secondary);font-size:0.9rem">规则：1号电影只在1号厅、2号只在2号厅……添加场次时只需选电影；系统将使用同编号影厅并自动初始化座位（若尚未创建）</p>
+            <div class="crud-form">
+                <p><b>添加场次</b></p>
+                <div class="form-row">
+                    <select id="sch-play" style="width:180px"></select>
+                    <span id="sch-studio-bind-hint" class="msg" style="color:var(--text-secondary);font-size:0.85rem;max-width:280px">请先选择电影</span>
+                    <input id="sch-date" placeholder="日期" value="2025-01-01" style="width:100px">
+                    <input id="sch-time" placeholder="时间" value="19:30" style="width:80px">
+                    <input id="sch-price" type="number" placeholder="票价" value="88" style="width:70px">
+                    <button onclick="addScheduleFromSch()">添加场次</button>
+                </div>
+                <div id="sch-msg"></div>
+            </div>
+            <p style="margin-top:1rem"><b>场次列表</b></p>
+            <p class="msg" style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:0.5rem">请先选择电影，再查看该电影的全部场次安排</p>
+            <div class="form-row">
+                <label>选择电影:</label>
+                <select id="sch-filter-play" style="min-width:240px"></select>
+            </div>
+            <div id="sch-by-movie-panel" class="schedule-by-movie-panel">
+                <h4 id="sch-by-movie-title"></h4>
+                <div id="sch-list" class="msg"></div>
+            </div>
+        </div>
+        <div id="panel-S" class="panel">
+            <h3>影院管理 · 定义各影院的座位矩阵（行×列）</h3>
+            <div id="studio-list" class="msg">加载中...</div>
+            <div id="studio-seat-area" style="display:none; margin-top:1rem">
+                <div class="form-row">
+                    <span id="studio-seat-title"></span>
+                    <button class="secondary" onclick="hideStudioSeat()">返回列表</button>
+                </div>
+                <div class="seat-legend">☐ 空位 &nbsp; ☑ 有人 &nbsp; ☒ 损坏 · 点击切换状态</div>
+                <div id="studio-seat-grid" class="grid-seat"></div>
+            </div>
+            <div id="studio-edit-area" style="display:none; margin-top:1rem; padding:1rem; background:var(--bg-dark); border-radius:8px">
+                <div class="form-row">
+                    <span>修改演出厅</span>
+                    <input id="edit-s-name" placeholder="名称" style="width:120px">
+                    <input id="edit-s-rows" type="number" placeholder="行数" style="width:70px" min="1">
+                    <input id="edit-s-cols" type="number" placeholder="列数" style="width:70px" min="1">
+                    <button onclick="saveStudioEdit()">保存</button>
+                    <button class="secondary" onclick="hideStudioEdit()">取消</button>
+                </div>
+            </div>
+            <div class="crud-form">
+                <div class="form-row">
+                    <input id="s-name" placeholder="名称" style="width:120px">
+                    <input id="s-rows" type="number" placeholder="行数" value="10" style="width:70px" min="1">
+                    <input id="s-cols" type="number" placeholder="列数" value="10" style="width:70px" min="1">
+                    <button onclick="addStudio()">添加</button>
+                </div>
+                <div id="studio-msg"></div>
+            </div>
+        </div>
+        <div id="panel-P" class="panel">
+            <h3>剧目管理</h3>
+            <div id="play-list" class="msg">加载中...</div>
+            <div class="crud-form">
+                <p><b>添加剧目</b></p>
+                <div class="form-row">
+                    <input id="p-name" placeholder="剧目名称" style="width:140px">
+                    <input id="p-type" placeholder="类型(电影/话剧等)" style="width:100px">
+                    <input id="p-duration" type="number" placeholder="时长(分钟)" value="120" style="width:90px">
+                    <button onclick="addPlay()">添加</button>
+                </div>
+                <div id="play-msg"></div>
+            </div>
+            <div class="crud-form" style="margin-top:1.5rem">
+                <p><b>添加排期</b></p>
+                <div class="form-row">
+                    <select id="p-play" style="width:180px"></select>
+                    <span id="p-studio-bind-hint" class="msg" style="color:var(--text-secondary);font-size:0.85rem;max-width:280px">请先选择剧目</span>
+                    <input id="p-date" placeholder="日期" value="2025-01-01" style="width:100px">
+                    <input id="p-time" placeholder="时间" value="19:30" style="width:80px">
+                    <input id="p-price" type="number" placeholder="票价" value="88" style="width:70px">
+                    <button onclick="addScheduleFromPlay()">添加排期</button>
+                </div>
+                <div id="p-schedule-msg"></div>
+                <p style="margin-top:1rem"><b>排期列表</b></p>
+                <p class="msg" style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:0.5rem">请先选择电影，再查看该电影的排期</p>
+                <div class="form-row">
+                    <label>选择电影:</label>
+                    <select id="p-schedule-filter-play" style="min-width:240px"></select>
+                </div>
+                <div id="p-by-movie-panel" class="schedule-by-movie-panel">
+                    <h4 id="p-by-movie-title"></h4>
+                    <div id="p-schedule-list" class="msg"></div>
+                </div>
+            </div>
+        </div>
+        <div id="panel-T" class="panel">
+            <h3>售票</h3>
+            <p class="msg" style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:0.5rem">每部电影仅在同编号影厅有场次。请先选电影，再选场次（已按日期、时间排序）</p>
+            <div class="form-row">
+                <label>选择电影:</label>
+                <select id="sell-filter-play" style="min-width:240px"></select>
+            </div>
+            <div class="form-row" style="margin-top:0.5rem">
+                <label>选择场次:</label>
+                <select id="sell-schedule" style="min-width:360px" disabled></select>
+            </div>
+            <div id="sell-schedule-info" class="schedule-info" style="display:none;margin:1rem 0;padding:1rem;background:var(--bg-dark);border-radius:8px;border:1px solid var(--border)">
+                <p style="margin-bottom:0.5rem"><b>场次信息</b></p>
+                <div class="form-row" style="flex-wrap:wrap;gap:0.5rem">
+                    <span>剧目: <b id="sell-play-name">-</b></span>
+                    <span>演出厅: <b id="sell-studio-name">-</b></span>
+                    <span>日期: <b id="sell-date">-</b></span>
+                    <span>时间: <b id="sell-time">-</b></span>
+                    <span>票价: <b id="sell-price" style="color:var(--accent-gold)">-</b> 元</span>
+                </div>
+            </div>
+            <div class="seat-section">
+                <div class="seat-legend">座位图 (- 可售 # 已售 X 损坏) · 点击可售座位直接出票 · 屏幕方向 ↓</div>
+                <div id="sell-seat-grid"></div>
+            </div>
+            <div class="form-row">
+                <span>行:</span><input type="number" id="sell-row" min="1" style="width:60px">
+                <span>列:</span><input type="number" id="sell-col" min="1" style="width:60px">
+                <button onclick="doSell()">出票</button>
+            </div>
+            <div id="sell-msg"></div>
+        </div>
+        <div id="panel-R" class="panel">
+            <h3>退票</h3>
+            <p class="msg" style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:0.5rem">仅列出<strong>已有售出记录</strong>的场次（按售票系统票据）。先选电影，再选场次。</p>
+            <p id="refund-role-hint" class="msg" style="color:var(--accent-gold);font-size:0.8rem;margin-bottom:0.5rem"></p>
+            <div class="form-row">
+                <label>选择电影:</label>
+                <select id="refund-filter-play" style="min-width:240px"></select>
+            </div>
+            <div class="form-row" style="margin-top:0.5rem">
+                <label>选择场次:</label>
+                <select id="refund-schedule" style="min-width:360px" disabled></select>
+            </div>
+            <div class="seat-section">
+                <div class="seat-legend">座位图：仅「#」表示<strong>本场次可退的已售座</strong>（以票据为准）· - 空位 · X 损坏 · 点击 # 退票</div>
+                <div id="refund-seat-grid"></div>
+            </div>
+            <div class="form-row">
+                <span>行:</span><input type="number" id="refund-row" min="1" style="width:60px">
+                <span>列:</span><input type="number" id="refund-col" min="1" style="width:60px">
+                <button onclick="doRefund()">退票</button>
+            </div>
+            <div id="refund-msg"></div>
+        </div>
+        <div id="panel-Q" class="panel">
+            <h3>查询</h3>
+            <div id="query-list" class="msg">加载中...</div>
+            <div id="q-add-schedule-form" class="crud-form" style="display:none">
+                <p style="margin-top:1rem"><b>添加排期</b></p>
+                <p class="msg" style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:0.5rem">影片与影厅编号绑定（如剧目1→1号厅）</p>
+                <div class="form-row">
+                    <select id="q-play" style="width:180px"></select>
+                    <span id="q-studio-bind-hint" class="msg" style="color:var(--text-secondary);font-size:0.85rem;max-width:280px">请先选择剧目</span>
+                    <input id="q-date" placeholder="日期" value="2025-01-01" style="width:100px">
+                    <input id="q-time" placeholder="时间" value="19:30" style="width:80px">
+                    <input id="q-price" type="number" placeholder="票价" value="88" style="width:70px">
+                    <button onclick="addSchedule()">添加</button>
+                </div>
+                <div id="schedule-msg"></div>
+            </div>
+            <div id="q-select-schedule-form" class="crud-form" style="display:none">
+                <p style="margin-top:1rem"><b>选择排期</b></p>
+                <div class="form-row">
+                    <label>排期:</label>
+                    <select id="q-schedule-select" style="width:280px"></select>
+                </div>
+                <div id="q-schedule-detail" style="margin-top:0.5rem;padding:0.75rem;background:var(--bg-dark);border-radius:8px;display:none"></div>
+            </div>
+        </div>
+        <div id="panel-N" class="panel">
+            <h3>排行榜与统计 <span id="ranking-hint" style="font-size:0.8rem;color:var(--text-secondary)"></span></h3>
+            <div id="ranking-list" class="msg">加载中...</div>
+        </div>
+        <div id="panel-A" class="panel">
+            <h3>账户管理</h3>
+            <div id="account-list" class="msg">加载中...</div>
+            <div id="account-add-form" class="crud-form">
+                <div class="form-row">
+                    <input id="a-username" placeholder="用户名" style="width:100px">
+                    <input id="a-password" type="password" placeholder="密码" style="width:100px">
+                    <select id="a-role"><option value="1">普通用户</option><option value="0">管理员</option></select>
+                    <button onclick="addAccount()">添加</button>
+                </div>
+                <div id="account-msg"></div>
+            </div>
+            <div id="account-self-form" class="crud-form" style="display:none">
+                <p><b>修改我的密码</b></p>
+                <div class="form-row">
+                    <input id="self-password" type="password" placeholder="新密码" style="width:120px">
+                    <button onclick="updateSelfPassword()">保存</button>
+                </div>
+                <div id="account-self-msg"></div>
+            </div>
+        </div>
+        <footer>剧院票务管理系统 · 后端: TTMS_Web.exe（C）/ run_web.bat · 端口 8765</footer>
+    </div>
+
+    <script>
+        /*
+         * Web 前端（简体注释摘要）
+         * - API：与页面同源；登录后通过 apiFetch 在请求头附加 X-User-Id、X-User-Role。
+         * - 会话：sessionStorage 键 ttms_user 保存当前用户 JSON。
+         * - 静态资源：图片、背景使用绝对路径 /static/...，由 TTMS_Web 映射到项目 static 文件夹。
+         * - 下文顺序大致为：鉴权与菜单 → 各模块数据加载与表格渲染 → 售票/退票 → 初始化。
+         */
+        const API = window.location.origin; /* 后端基地址，如 http://127.0.0.1:8765 */
+        const panels = document.querySelectorAll('.panel'); /* 各功能面板 DOM */
+        const menuItems = document.querySelectorAll('.menu-item'); /* 主菜单项 */
+        const USER_KEY = 'ttms_user'; /* sessionStorage 中用户缓存键名 */
+
+        function getCurrentUser() { /* 读取已登录用户，无则 null */
+            try {
+                const s = sessionStorage.getItem(USER_KEY);
+                return s ? JSON.parse(s) : null;
+            } catch (e) { return null; }
+        }
+        function setCurrentUser(u) { sessionStorage.setItem(USER_KEY, JSON.stringify(u)); } /* 写入登录态 */
+        function clearUser() { sessionStorage.removeItem(USER_KEY); } /* 登出清除 */
+
+        function checkAuth() { /* 根据 session 显示登录页或主界面 */
+            const u = getCurrentUser();
+            if (!u) {
+                document.getElementById('login-screen').style.display = 'block';
+                document.getElementById('register-screen').style.display = 'none';
+                document.getElementById('main-app').style.display = 'none';
+                return false;
+            }
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('register-screen').style.display = 'none';
+            document.getElementById('main-app').style.display = 'block';
+            document.getElementById('current-username').textContent = u.username;
+            document.getElementById('user-role-badge').textContent = u.role === 0 ? '(管理员)' : '';
+            updateMenuByRole();
+            return true;
+        }
+        function updateMenuByRole() { /* 管理员可见 .admin-only 菜单 */
+            const u = getCurrentUser();
+            const isAdmin = u && u.role === 0;
+            document.querySelectorAll('.menu-item.admin-only').forEach(el => {
+                el.style.display = isAdmin ? '' : 'none';
+            });
+        }
+
+        async function doLogin() { /* POST /api/login */
+            const username = document.getElementById('login-username').value.trim();
+            const password = document.getElementById('login-password').value;
+            const msg = document.getElementById('login-msg');
+            if (!username || !password) {
+                msg.innerHTML = '<span class="err">请输入账户名称和密码</span>';
+                return;
+            }
+            document.getElementById('login-msg').innerHTML = '';
+            const res = await fetch(API + '/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            }).then(r => r.json());
+            if (res.ok) {
+                setCurrentUser(res.user);
+                document.getElementById('login-username').value = '';
+                document.getElementById('login-password').value = '';
+                checkAuth();
+                const u = getCurrentUser();
+                showPanel((u && u.role === 0) ? 'SCH' : 'T');
+            } else {
+                msg.innerHTML = '<span class="err">' + (res.msg || '登录失败') + '</span>';
+            }
+        }
+
+        async function doRegister() { /* POST /api/register */
+            const username = document.getElementById('reg-username').value.trim();
+            const password = document.getElementById('reg-password').value;
+            const password2 = document.getElementById('reg-password2').value;
+            const msg = document.getElementById('reg-msg');
+            if (!username) {
+                msg.innerHTML = '<span class="err">请输入账户名称</span>';
+                return;
+            }
+            if (password.length < 6) {
+                msg.innerHTML = '<span class="err">密码至少6位</span>';
+                return;
+            }
+            if (password !== password2) {
+                msg.innerHTML = '<span class="err">两次密码不一致</span>';
+                return;
+            }
+            msg.innerHTML = '';
+            const res = await fetch(API + '/api/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            }).then(r => r.json());
+            if (res.ok) {
+                setCurrentUser(res.user);
+                document.getElementById('reg-username').value = '';
+                document.getElementById('reg-password').value = '';
+                document.getElementById('reg-password2').value = '';
+                checkAuth();
+                const u = getCurrentUser();
+                showPanel((u && u.role === 0) ? 'SCH' : 'T');
+            } else {
+                msg.innerHTML = '<span class="err">' + (res.msg || '创建失败') + '</span>';
+            }
+        }
+
+        function showLogin() {
+            document.getElementById('login-screen').style.display = 'block';
+            document.getElementById('register-screen').style.display = 'none';
+            document.getElementById('login-msg').innerHTML = '';
+        }
+        function showRegister() {
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('register-screen').style.display = 'block';
+            document.getElementById('reg-msg').innerHTML = '';
+        }
+        function doLogout() {
+            clearUser();
+            checkAuth();
+        }
+
+        document.getElementById('go-register').onclick = showRegister;
+
+        document.getElementById('login-password').onkeydown = function(e) {
+            if (e.key === 'Enter') doLogin();
+        };
+        document.getElementById('login-username').onkeydown = function(e) {
+            if (e.key === 'Enter') document.getElementById('login-password').focus();
+        };
+
+        function showPanel(key) {
+            panels.forEach(p => p.classList.remove('show'));
+            menuItems.forEach(m => m.classList.remove('active'));
+            const p = document.getElementById('panel-' + key);
+            const m = document.querySelector('[data-key="' + key + '"]');
+            if (p) p.classList.add('show');
+            if (m) m.classList.add('active');
+            loadPanel(key);
+        }
+
+        function loadPanel(key) {
+            if (key === 'SCH') loadSchedules();
+            else if (key === 'S') loadStudios();
+            else if (key === 'P') loadPlays();
+            else if (key === 'T') loadSell();
+            else if (key === 'R') loadRefund();
+            else if (key === 'Q') loadQuery();
+            else if (key === 'N') loadRanking();
+            else if (key === 'A') loadAccounts();
+        }
+
+        function authHeaders() {
+            const u = getCurrentUser();
+            const h = {};
+            if (u) { h['X-User-Id'] = String(u.id); h['X-User-Role'] = String(u.role); }
+            return h;
+        }
+        async function fetchWithAuth(url) {
+            const r = await fetch(API + url, { headers: authHeaders() });
+            const data = await r.json().catch(() => ({}));
+            if (r.status === 401 || (data && data.code === 401)) {
+                clearUser();
+                checkAuth();
+                throw new Error(data.msg || '请先登录');
+            }
+            return data;
+        }
+        async function api(method, url, body) {
+            const headers = { 'Content-Type': 'application/json', ...authHeaders() };
+            const opt = { method, headers };
+            if (body) opt.body = JSON.stringify(body);
+            const r = await fetch(API + url, opt);
+            const data = await r.json().catch(() => ({}));
+            if (r.status === 401 || (data && data.code === 401)) {
+                clearUser();
+                checkAuth();
+                throw new Error(data.msg || '请先登录');
+            }
+            return data;
+        }
+
+        function escapeHtml(s) {
+            if (s == null) return '';
+            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+        /** 每部电影固定在同编号影厅：提示绑定关系 */
+        function updatePlayStudioBindHint(playSelId, hintId, studios) {
+            const ps = document.getElementById(playSelId);
+            const hint = document.getElementById(hintId);
+            if (!ps || !hint) return;
+            const pid = ps.value;
+            if (!pid) {
+                hint.textContent = (playSelId === 'p-play' || playSelId === 'q-play') ? '请先选择剧目' : '请先选择电影';
+                return;
+            }
+            const st = (studios || []).find(s => String(s.id) === String(pid));
+            if (st) {
+                hint.innerHTML = '固定影厅：<b>' + escapeHtml(st.name) + '</b>（编号 ' + pid + '，与影片ID相同）';
+            } else {
+                hint.innerHTML = '固定影厅编号 <b>' + escapeHtml(pid) + '</b>（请先在影院管理中添加同号影厅）';
+            }
+        }
+        /** 只保留「影片与影厅同号」的排期 */
+        function schedulesPlayStudioBound(list) {
+            return (list || []).filter(s => Number(s.playID) === Number(s.studioID));
+        }
+        function sortSchedulesForDisplay(list) {
+            return [...list].sort((a, b) => {
+                const da = (a.date || '').localeCompare(b.date || '');
+                if (da !== 0) return da;
+                return (a.time || '').localeCompare(b.time || '');
+            });
+        }
+
+        function renderSchedulesByMovie(mode) {
+            const cfg = mode === 'sch' ? {
+                cacheKey: '_schScheduleCache',
+                filterId: 'sch-filter-play',
+                panelId: 'sch-by-movie-panel',
+                titleId: 'sch-by-movie-title',
+                listId: 'sch-list',
+                reload: () => loadSchedules()
+            } : {
+                cacheKey: '_pScheduleCache',
+                filterId: 'p-schedule-filter-play',
+                panelId: 'p-by-movie-panel',
+                titleId: 'p-by-movie-title',
+                listId: 'p-schedule-list',
+                reload: () => loadPlays()
+            };
+            const c = window[cfg.cacheKey];
+            const listEl = document.getElementById(cfg.listId);
+            const panelEl = document.getElementById(cfg.panelId);
+            const titleEl = document.getElementById(cfg.titleId);
+            const filterEl = document.getElementById(cfg.filterId);
+            if (!c || !filterEl) return;
+            const pid = filterEl.value;
+            if (!Array.isArray(c.schedules) || c.schedules.length === 0) {
+                panelEl.classList.add('show');
+                titleEl.textContent = '';
+                listEl.innerHTML = '<p class="msg" style="color:var(--text-secondary)">暂无场次，请先添加影院和剧目后再添加场次</p>';
+                return;
+            }
+            if (!pid) {
+                panelEl.classList.remove('show');
+                titleEl.textContent = '';
+                listEl.innerHTML = '';
+                return;
+            }
+            const play = (c.plays || []).find(p => String(p.id) === String(pid));
+            const sub = sortSchedulesForDisplay(schedulesPlayStudioBound(c.schedules || []).filter(s => String(s.playID) === String(pid)));
+            panelEl.classList.add('show');
+            titleEl.textContent = '《' + (play ? play.name : '') + '》 共 ' + sub.length + ' 场 · 已按日期、时间排序（固定同编号影厅）';
+            if (sub.length === 0) {
+                listEl.innerHTML = '<p class="msg" style="color:var(--text-secondary)">该片暂无场次</p>';
+                return;
+            }
+            const delFn = mode === 'sch' ? 'loadSchedules()' : 'loadPlays()';
+            listEl.innerHTML = '<table><tr><th>场次ID</th><th>影院</th><th>座位矩阵</th><th>日期</th><th>时间</th><th>票价</th><th>操作</th></tr>' +
+                sub.map(s => {
+                    const studio = (c.studios || []).find(st => st.id === s.studioID) || {};
+                    const matrix = (studio.rows != null) ? studio.rows + '×' + studio.cols : '-';
+                    return '<tr><td>' + s.id + '</td><td>' + escapeHtml(studio.name || '-') + '</td><td>' + matrix + '</td><td>' + escapeHtml(s.date) + '</td><td>' + escapeHtml(s.time) + '</td><td>' + s.price + '元</td><td><button class="small danger" onclick="delSchedule(' + s.id + ').then(()=>' + delFn + ')">删除</button></td></tr>';
+                }).join('') + '</table>';
+        }
+
+        function renderQueryAdminSchedules() {
+            const c = window._queryCache;
+            if (!c || !c.isAdmin) return;
+            const qf = document.getElementById('q-admin-play-filter');
+            if (!qf) return;
+            const pid = qf.value;
+            const panel = document.getElementById('q-admin-by-movie-panel');
+            const title = document.getElementById('q-admin-by-movie-title');
+            const listEl = document.getElementById('q-admin-schedule-list');
+            if (!panel || !title || !listEl) return;
+            if (!Array.isArray(c.schedules) || c.schedules.length === 0) {
+                panel.classList.add('show');
+                title.textContent = '';
+                listEl.innerHTML = '<p class="msg" style="color:var(--text-secondary)">暂无排期</p>';
+                return;
+            }
+            if (!pid) {
+                panel.classList.remove('show');
+                title.textContent = '';
+                listEl.innerHTML = '';
+                return;
+            }
+            const play = (c.plays || []).find(p => String(p.id) === String(pid));
+            const sub = sortSchedulesForDisplay(schedulesPlayStudioBound(c.schedules || []).filter(s => String(s.playID) === String(pid)));
+            panel.classList.add('show');
+            title.textContent = '《' + (play ? play.name : '') + '》 共 ' + sub.length + ' 场 · 已按日期、时间排序（固定同编号影厅）';
+            if (sub.length === 0) {
+                listEl.innerHTML = '<p class="msg" style="color:var(--text-secondary)">该片暂无场次</p>';
+                return;
+            }
+            listEl.innerHTML = '<table><tr><th>场次ID</th><th>影院</th><th>座位矩阵</th><th>日期</th><th>时间</th><th>票价</th><th>操作</th></tr>' +
+                sub.map(s => {
+                    const studio = (c.studios || []).find(st => st.id === s.studioID) || {};
+                    const matrix = (studio.rows != null) ? studio.rows + '×' + studio.cols : '-';
+                    return '<tr><td>' + s.id + '</td><td>' + escapeHtml(studio.name || '-') + '</td><td>' + matrix + '</td><td>' + escapeHtml(s.date) + '</td><td>' + escapeHtml(s.time) + '</td><td>' + s.price + '元</td><td><button class="small danger" onclick="delSchedule(' + s.id + ').then(()=>loadQuery())">删除</button></td></tr>';
+                }).join('') + '</table>';
+        }
+
+        async function loadSchedules() {
+            try {
+                const [plays, studios, schedules] = await Promise.all([
+                    fetchWithAuth('/api/plays'),
+                    fetchWithAuth('/api/studios'),
+                    fetchWithAuth('/api/schedules')
+                ]);
+                window._schScheduleCache = { plays, studios, schedules };
+                document.getElementById('sch-play').innerHTML = '<option value="">选择电影</option>' + (plays || []).map(p => `<option value="${p.id}">${p.id}-${escapeHtml(p.name)}</option>`).join('');
+                const schPlayEl = document.getElementById('sch-play');
+                schPlayEl.onchange = () => updatePlayStudioBindHint('sch-play', 'sch-studio-bind-hint', studios || []);
+                updatePlayStudioBindHint('sch-play', 'sch-studio-bind-hint', studios || []);
+                const filterSel = document.getElementById('sch-filter-play');
+                const prev = filterSel.value;
+                filterSel.innerHTML = '<option value="">— 请选择电影 —</option>' + (plays || []).map(p => `<option value="${p.id}">${p.id}-${escapeHtml(p.name)}</option>`).join('');
+                if (prev && [...filterSel.options].some(o => o.value === prev)) filterSel.value = prev;
+                filterSel.onchange = () => renderSchedulesByMovie('sch');
+                renderSchedulesByMovie('sch');
+            } catch (e) {
+                document.getElementById('sch-list').innerHTML = '<span class="err">加载失败</span>';
+                document.getElementById('sch-by-movie-panel').classList.remove('show');
+            }
+        }
+
+        async function addScheduleFromSch() {
+            const playID = document.getElementById('sch-play').value;
+            const studioID = parseInt(playID, 10);
+            const date = document.getElementById('sch-date').value;
+            const time = document.getElementById('sch-time').value;
+            const price = parseFloat(document.getElementById('sch-price').value) || 88;
+            const msg = document.getElementById('sch-msg');
+            if (!playID) return msg.innerHTML = '<span class="err">请选择电影</span>';
+            const res = await api('POST', '/api/schedule', { action: 'add', playID: parseInt(playID, 10), studioID, date, time, price });
+            msg.innerHTML = res.ok ? '<span class="ok">' + res.msg + '</span>' : '<span class="err">' + res.msg + '</span>';
+            if (res.ok) loadSchedules();
+        }
+
+        async function loadStudios() {
+            const el = document.getElementById('studio-list');
+            try {
+                const list = await api('GET', '/api/studios');
+                if (list.length === 0) return el.innerHTML = '暂无演出厅数据';
+                el.innerHTML = '<table><tr><th>ID</th><th>名称</th><th>行</th><th>列</th><th>座位数</th><th>剩余座位</th><th>操作</th></tr>' +
+                    list.map(s => `<tr><td>${s.id}</td><td>${s.name}</td><td>${s.rows}</td><td>${s.cols}</td><td>${s.seatsCount}</td><td>${s.remainingSeats ?? '-'}</td><td>
+                        <button class="small" onclick="showStudioEdit(event,${s.id},${s.rows},${s.cols})" data-name="${(s.name||'').replace(/"/g,'&quot;')}">[U]修改</button>
+                        <button class="small" onclick="showStudioSeat(event,${s.id},${s.rows},${s.cols})" data-name="${(s.name||'').replace(/"/g,'&quot;')}">[S]座位</button>
+                        <button class="small" onclick="initSeats(${s.id})">初始化座位</button>
+                        <button class="small danger" onclick="delStudio(${s.id})">删除</button></td></tr>`).join('') + '</table>';
+            } catch (e) {
+                el.innerHTML = '<span class="err">加载失败，请确保已运行 run_web.bat 启动 TTMS_Web.exe</span>';
+            }
+        }
+
+        async function addStudio() {
+            const name = document.getElementById('s-name').value.trim();
+            const rows = parseInt(document.getElementById('s-rows').value) || 10;
+            const cols = parseInt(document.getElementById('s-cols').value) || 10;
+            const msg = document.getElementById('studio-msg');
+            if (!name) return msg.innerHTML = '<span class="err">请输入名称</span>';
+            const res = await api('POST', '/api/studio', { action: 'add', name, rows, cols });
+            msg.innerHTML = res.ok ? '<span class="ok">' + res.msg + '</span>' : '<span class="err">' + res.msg + '</span>';
+            if (res.ok) { document.getElementById('s-name').value = ''; loadStudios(); }
+        }
+
+        async function initSeats(id) {
+            const res = await api('POST', '/api/studio', { action: 'init-seats', id });
+            document.getElementById('studio-msg').innerHTML = res.ok ? '<span class="ok">' + res.msg + '</span>' : '<span class="err">' + res.msg + '</span>';
+            if (res.ok) loadStudios();
+        }
+
+        async function delStudio(id) {
+            if (!confirm('确定删除该演出厅？将同时删除其座位数据。')) return;
+            const res = await api('DELETE', '/api/studio/' + id);
+            document.getElementById('studio-msg').innerHTML = res.ok ? '<span class="ok">' + res.msg + '</span>' : '<span class="err">' + (res.msg || '失败') + '</span>';
+            if (res.ok) { hideStudioSeat(); hideStudioEdit(); loadStudios(); }
+        }
+
+        let editingStudioId = null;
+        function showStudioEdit(e, id, rows, cols) {
+            const btn = e && e.target;
+            editingStudioId = id;
+            document.getElementById('edit-s-name').value = (btn && btn.dataset.name) || '';
+            document.getElementById('edit-s-rows').value = rows;
+            document.getElementById('edit-s-cols').value = cols;
+            document.getElementById('studio-edit-area').style.display = 'block';
+        }
+        function hideStudioEdit() {
+            editingStudioId = null;
+            document.getElementById('studio-edit-area').style.display = 'none';
+        }
+        async function saveStudioEdit() {
+            if (!editingStudioId) return;
+            const name = document.getElementById('edit-s-name').value.trim();
+            const rows = parseInt(document.getElementById('edit-s-rows').value) || 10;
+            const cols = parseInt(document.getElementById('edit-s-cols').value) || 10;
+            const res = await api('POST', '/api/studio', { action: 'update', id: editingStudioId, name, rows, cols });
+            document.getElementById('studio-msg').innerHTML = res.ok ? '<span class="ok">' + res.msg + '</span>' : '<span class="err">' + res.msg + '</span>';
+            if (res.ok) { hideStudioEdit(); loadStudios(); }
+        }
+
+        let seatStudioId = null, seatStudioRows = 0, seatStudioCols = 0;
+        function showStudioSeat(e, id, rows, cols) {
+            const btn = e && e.target;
+            seatStudioId = id;
+            seatStudioRows = rows;
+            seatStudioCols = cols;
+            document.getElementById('studio-seat-title').textContent = (btn && btn.dataset.name || '') + ' 座位图';
+            document.getElementById('studio-seat-area').style.display = 'block';
+            document.getElementById('studio-list').style.display = 'none';
+            loadStudioSeatGrid();
+        }
+        function hideStudioSeat() {
+            seatStudioId = null;
+            document.getElementById('studio-seat-area').style.display = 'none';
+            document.getElementById('studio-list').style.display = '';
+        }
+        async function loadStudioSeatGrid() {
+            if (!seatStudioId) return;
+            const seats = await api('GET', '/api/seats?room=' + seatStudioId);
+            const seatMap = {};
+            seats.forEach(s => { seatMap[s.row + ',' + s.col] = s.status; });
+            const chars = { 0: '☐', 1: '☑', 9: '☒' };
+            let html = '<div class="grid-seat studio-seat" style="grid-template-columns:repeat(' + (seatStudioCols + 1) + ',auto)">';
+            html += '<span></span>';
+            for (let c = 0; c < seatStudioCols; c++) html += '<span style="font-size:0.75rem">' + (c + 1) + '</span>';
+            for (let r = 0; r < seatStudioRows; r++) {
+                html += '<span style="font-size:0.75rem">' + (r + 1) + '</span>';
+                for (let c = 0; c < seatStudioCols; c++) {
+                    const key = r + ',' + c;
+                    const status = seatMap[key] !== undefined ? seatMap[key] : 0;
+                    const ch = chars[status] || '☐';
+                    const nextStatus = status === 0 ? 1 : status === 1 ? 9 : 0;
+                    html += '<span class="seat-cell" data-row="' + r + '" data-col="' + c + '" data-status="' + status + '" title="' + (r+1) + '行' + (c+1) + '列 点击切换">' + ch + '</span>';
+                }
+            }
+            html += '</div>';
+            document.getElementById('studio-seat-grid').innerHTML = html;
+            document.getElementById('studio-seat-grid').querySelectorAll('.seat-cell').forEach(sp => {
+                sp.onclick = async () => {
+                    const row = parseInt(sp.dataset.row);
+                    const col = parseInt(sp.dataset.col);
+                    const nextStatus = sp.dataset.status == 0 ? 1 : sp.dataset.status == 1 ? 9 : 0;
+                    const res = await api('POST', '/api/seat', { action: 'set', roomID: seatStudioId, row, col, status: nextStatus });
+                    if (res.ok) loadStudioSeatGrid();
+                };
+            });
+        }
+
+        async function loadPlays() {
+            const el = document.getElementById('play-list');
+            try {
+                const [list, schedules, studios] = await Promise.all([
+                    api('GET', '/api/plays'),
+                    fetchWithAuth('/api/schedules'),
+                    fetchWithAuth('/api/studios')
+                ]);
+                if (!Array.isArray(list)) return el.innerHTML = '<span class="err">加载失败</span>';
+                if (list.length === 0) el.innerHTML = '暂无剧目数据';
+                else el.innerHTML = '<table><tr><th>ID</th><th>名称</th><th>类型</th><th>时长</th><th>操作</th></tr>' +
+                    list.map(p => `<tr><td>${p.id}</td><td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.type)}</td><td>${p.duration}min</td><td>
+                        <button class="small danger" onclick="delPlay(${p.id})">删除</button></td></tr>`).join('') + '</table>';
+                document.getElementById('p-play').innerHTML = '<option value="">选择剧目</option>' + (list || []).map(p => `<option value="${p.id}">${p.id}-${escapeHtml(p.name)}</option>`).join('');
+                const pPlayEl = document.getElementById('p-play');
+                pPlayEl.onchange = () => updatePlayStudioBindHint('p-play', 'p-studio-bind-hint', studios || []);
+                updatePlayStudioBindHint('p-play', 'p-studio-bind-hint', studios || []);
+                window._pScheduleCache = { plays: list, studios, schedules };
+                const pFilter = document.getElementById('p-schedule-filter-play');
+                const prevP = pFilter.value;
+                pFilter.innerHTML = '<option value="">— 请选择电影 —</option>' + (list || []).map(p => `<option value="${p.id}">${p.id}-${escapeHtml(p.name)}</option>`).join('');
+                if (prevP && [...pFilter.options].some(o => o.value === prevP)) pFilter.value = prevP;
+                pFilter.onchange = () => renderSchedulesByMovie('p');
+                renderSchedulesByMovie('p');
+            } catch (e) {
+                el.innerHTML = '<span class="err">加载失败</span>';
+            }
+        }
+
+        async function addPlay() {
+            const name = document.getElementById('p-name').value.trim();
+            const type = document.getElementById('p-type').value.trim() || '电影';
+            const duration = parseInt(document.getElementById('p-duration').value) || 120;
+            const msg = document.getElementById('play-msg');
+            if (!name) return msg.innerHTML = '<span class="err">请输入剧目名称</span>';
+            const res = await api('POST', '/api/play', { action: 'add', name, type, duration });
+            msg.innerHTML = res.ok ? '<span class="ok">' + res.msg + '</span>' : '<span class="err">' + res.msg + '</span>';
+            if (res.ok) { document.getElementById('p-name').value = ''; loadPlays(); }
+        }
+
+        async function delPlay(id) {
+            if (!confirm('确定删除该剧目？')) return;
+            const res = await api('DELETE', '/api/play/' + id);
+            document.getElementById('play-msg').innerHTML = res.ok ? '<span class="ok">' + res.msg + '</span>' : '<span class="err">' + (res.msg || '失败') + '</span>';
+            if (res.ok) loadPlays();
+        }
+
+        async function addScheduleFromPlay() {
+            const playID = document.getElementById('p-play').value;
+            const studioID = parseInt(playID, 10);
+            const date = document.getElementById('p-date').value;
+            const time = document.getElementById('p-time').value;
+            const price = parseFloat(document.getElementById('p-price').value) || 88;
+            const msg = document.getElementById('p-schedule-msg');
+            if (!playID) return msg.innerHTML = '<span class="err">请选择剧目</span>';
+            const res = await api('POST', '/api/schedule', { action: 'add', playID: parseInt(playID, 10), studioID, date, time, price });
+            msg.innerHTML = res.ok ? '<span class="ok">' + res.msg + '</span>' : '<span class="err">' + res.msg + '</span>';
+            if (res.ok) loadPlays();
+        }
+
+        function refillSellScheduleDropdown() {
+            const c = window._sellCache;
+            const sel = document.getElementById('sell-schedule');
+            const pf = document.getElementById('sell-filter-play');
+            if (!c || !sel || !pf) return;
+            const pid = pf.value;
+            const prev = window._sellScheduleValue;
+            sel.innerHTML = '<option value="">— 请选择场次 —</option>';
+            if (!pid) {
+                sel.disabled = true;
+                sel.value = '';
+                updateSeatGrid(c.schedules, c.studios, c.plays);
+                return;
+            }
+            const list = sortSchedulesForDisplay(schedulesPlayStudioBound(c.schedules || []).filter(s => String(s.playID) === String(pid)));
+            if (list.length === 0) {
+                sel.innerHTML = '<option value="">— 该片暂无场次 —</option>';
+                sel.disabled = true;
+                window._sellScheduleValue = '';
+                updateSeatGrid(c.schedules, c.studios, c.plays);
+                return;
+            }
+            sel.disabled = false;
+            list.forEach(s => {
+                const studio = (c.studios || []).find(x => x.id === s.studioID) || {};
+                const opt = document.createElement('option');
+                opt.value = s.id;
+                opt.textContent = s.date + ' ' + s.time + ' · ' + (studio.name || '?') + '（' + pid + '号厅）· ' + s.price + '元 · 场次#' + s.id;
+                sel.appendChild(opt);
+            });
+            if (prev && [...sel.options].some(o => o.value === String(prev))) sel.value = String(prev);
+            else sel.value = '';
+            sel.onchange = () => {
+                window._sellScheduleValue = sel.value;
+                updateSeatGrid(c.schedules, c.studios, c.plays);
+            };
+            updateSeatGrid(c.schedules, c.studios, c.plays);
+        }
+
+        async function loadSell() {
+            try {
+                const [schedules, studios, plays] = await Promise.all([
+                    fetchWithAuth('/api/schedules'),
+                    fetchWithAuth('/api/studios'),
+                    fetchWithAuth('/api/plays')
+                ]);
+                window._sellCache = { schedules, studios, plays };
+                const pf = document.getElementById('sell-filter-play');
+                const prevP = window._sellPlayFilterValue;
+                pf.innerHTML = '<option value="">— 请选择电影 —</option>' +
+                    (plays || []).map(p => `<option value="${p.id}">${p.id}-${escapeHtml(p.name)}</option>`).join('');
+                if (prevP && [...pf.options].some(o => o.value === String(prevP))) pf.value = String(prevP);
+                else pf.value = '';
+                pf.onchange = () => {
+                    window._sellPlayFilterValue = pf.value;
+                    window._sellScheduleValue = '';
+                    refillSellScheduleDropdown();
+                };
+                refillSellScheduleDropdown();
+                document.getElementById('sell-msg').innerHTML = '';
+                document.getElementById('sell-schedule-info').style.display = 'none';
+            } catch (e) {
+                document.getElementById('sell-seat-grid').innerHTML = '<span class="err">加载失败</span>';
+            }
+        }
+
+        async function updateSeatGrid(schedules, studios, plays) {
+            const playId = document.getElementById('sell-filter-play') && document.getElementById('sell-filter-play').value;
+            const sid = document.getElementById('sell-schedule').value;
+            const grid = document.getElementById('sell-seat-grid');
+            const infoEl = document.getElementById('sell-schedule-info');
+            if (!playId) {
+                grid.innerHTML = '<p style="color:var(--text-secondary)">请先选择电影</p>';
+                infoEl.style.display = 'none';
+                return;
+            }
+            if (!sid) {
+                grid.innerHTML = '<p style="color:var(--text-secondary)">请选择该电影下的具体场次</p>';
+                infoEl.style.display = 'none';
+                return;
+            }
+            const sc = schedules.find(s => s.id == sid);
+            if (!sc) return;
+            const studio = studios.find(s => s.id === sc.studioID);
+            const play = (plays || []).find(p => p.id === sc.playID);
+            if (!studio) {
+                grid.innerHTML = '演出厅不存在';
+                infoEl.style.display = 'none';
+                return;
+            }
+            infoEl.style.display = 'block';
+            document.getElementById('sell-play-name').textContent = play ? play.name : '-';
+            document.getElementById('sell-studio-name').textContent = studio.name || '-';
+            document.getElementById('sell-date').textContent = sc.date || '-';
+            document.getElementById('sell-time').textContent = sc.time || '-';
+            document.getElementById('sell-price').textContent = sc.price != null ? sc.price : '-';
+            const [seats, tickets] = await Promise.all([
+                fetchWithAuth('/api/seats?room=' + sc.studioID),
+                fetchWithAuth('/api/tickets?schedule=' + sid)
+            ]);
+            const soldMap = {};
+            tickets.filter(t => t.status === 1).forEach(t => { soldMap[t.seatID] = 1; });
+            const seatMap = {};
+            seats.forEach(s => { seatMap[s.row + ',' + s.col] = s; });
+            let html = '<div class="seat-preview-wrap"><div class="screen-hint">银幕 ↓</div>';
+            html += '<div class="grid-seat" style="grid-template-columns:repeat(' + (studio.cols + 1) + ',auto)">';
+            html += '<span></span>';
+            for (let c = 0; c < studio.cols; c++) html += '<span style="font-size:0.7rem">' + (c + 1) + '</span>';
+            for (let r = 0; r < studio.rows; r++) {
+                html += '<span style="font-size:0.7rem">' + (r + 1) + '</span>';
+                for (let c = 0; c < studio.cols; c++) {
+                    const key = r + ',' + c;
+                    const seat = seatMap[key];
+                    let cls = 'sell';
+                    let ch = '-';
+                    if (seat) {
+                        if (soldMap[seat.id]) { cls = 'sold'; ch = '#'; }
+                        else if (seat.status === 9) { cls = 'broken'; ch = 'X'; }
+                    }
+                    html += '<span class="' + cls + '" data-row="' + r + '" data-col="' + c + '" title="' + (r + 1) + '行' + (c + 1) + '列">' + ch + '</span>';
+                }
+            }
+            html += '</div></div>';
+            grid.innerHTML = html;
+            grid.querySelectorAll('span.sell').forEach(sp => {
+                sp.onclick = async () => {
+                    const row = parseInt(sp.dataset.row);
+                    const col = parseInt(sp.dataset.col);
+                    const res = await api('POST', '/api/sell', { scheduleID: parseInt(sid), row, col });
+                    const msg = document.getElementById('sell-msg');
+                    msg.innerHTML = res.ok ? '<span class="ok">' + res.msg + '</span>' : '<span class="err">' + res.msg + '</span>';
+                    if (res.ok) loadSell();
+                };
+            });
+        }
+
+        async function doSell() {
+            const pid = document.getElementById('sell-filter-play').value;
+            const sid = document.getElementById('sell-schedule').value;
+            const row = parseInt(document.getElementById('sell-row').value) - 1;
+            const col = parseInt(document.getElementById('sell-col').value) - 1;
+            const msg = document.getElementById('sell-msg');
+            if (!pid) return msg.innerHTML = '<span class="err">请先选择电影</span>';
+            if (!sid) return msg.innerHTML = '<span class="err">请选择场次</span>';
+            if (isNaN(row) || isNaN(col) || row < 0 || col < 0) return msg.innerHTML = '<span class="err">请输入有效行列</span>';
+            const res = await api('POST', '/api/sell', { scheduleID: parseInt(sid), row, col });
+            msg.innerHTML = res.ok ? '<span class="ok">' + res.msg + '</span>' : '<span class="err">' + res.msg + '</span>';
+            if (res.ok) loadSell();
+        }
+
+        function refillRefundScheduleDropdown() {
+            const c = window._refundCache;
+            const sel = document.getElementById('refund-schedule');
+            const pf = document.getElementById('refund-filter-play');
+            if (!c || !sel || !pf) return;
+            const pid = pf.value;
+            const prev = window._refundScheduleValue;
+            const sidSold = c.scheduleIdsWithSold || new Set();
+            sel.innerHTML = '<option value="">— 请选择场次 —</option>';
+            if (!pid) {
+                sel.disabled = true;
+                sel.value = '';
+                updateRefundGrid(c.schedules, c.studios);
+                return;
+            }
+            const list = sortSchedulesForDisplay(schedulesPlayStudioBound(c.schedules || []).filter(s =>
+                String(s.playID) === String(pid) && sidSold.has(s.id)));
+            if (list.length === 0) {
+                sel.innerHTML = '<option value="">— 该片暂无已售票场次 —</option>';
+                sel.disabled = true;
+                window._refundScheduleValue = '';
+                updateRefundGrid(c.schedules, c.studios);
+                return;
+            }
+            sel.disabled = false;
+            const cnt = c.refundCountBySchedule || {};
+            list.forEach(s => {
+                const studio = (c.studios || []).find(x => x.id === s.studioID) || {};
+                const opt = document.createElement('option');
+                opt.value = s.id;
+                const n = cnt[s.id] != null ? cnt[s.id] : 0;
+                opt.textContent = s.date + ' ' + s.time + ' · ' + (studio.name || '?') + '（' + pid + '号厅）· 已售' + n + '张可退 · 场次#' + s.id;
+                sel.appendChild(opt);
+            });
+            if (prev && [...sel.options].some(o => o.value === String(prev))) sel.value = String(prev);
+            else sel.value = '';
+            sel.onchange = () => {
+                window._refundScheduleValue = sel.value;
+                updateRefundGrid(c.schedules, c.studios);
+            };
+            updateRefundGrid(c.schedules, c.studios);
+        }
+
+        async function loadRefund() {
+            try {
+                const [schedules, studios, plays, tickets] = await Promise.all([
+                    fetchWithAuth('/api/schedules'),
+                    fetchWithAuth('/api/studios'),
+                    fetchWithAuth('/api/plays'),
+                    fetchWithAuth('/api/tickets')
+                ]);
+                const soldTickets = (tickets || []).filter(t => t.status === 1);
+                const scheduleIdsWithSold = new Set(soldTickets.map(t => t.scheduleID));
+                const refundCountBySchedule = {};
+                soldTickets.forEach(t => {
+                    const k = t.scheduleID;
+                    refundCountBySchedule[k] = (refundCountBySchedule[k] || 0) + 1;
+                });
+                const playIdsWithSold = new Set();
+                (schedules || []).forEach(s => {
+                    if (scheduleIdsWithSold.has(s.id) && Number(s.playID) === Number(s.studioID))
+                        playIdsWithSold.add(s.playID);
+                });
+                window._refundCache = { schedules, studios, plays, tickets, scheduleIdsWithSold, refundCountBySchedule };
+                const u = getCurrentUser();
+                const hint = document.getElementById('refund-role-hint');
+                if (hint) {
+                    hint.textContent = u && u.role === 0
+                        ? '管理员：可退本场次任意已售票。'
+                        : '普通用户：仅显示并退回您本人购买的票。';
+                }
+                const pf = document.getElementById('refund-filter-play');
+                const prevP = window._refundPlayFilterValue;
+                const playsFiltered = (plays || []).filter(p => playIdsWithSold.has(p.id));
+                if (playsFiltered.length === 0) {
+                    pf.innerHTML = '<option value="">暂无已售票的场次</option>';
+                    pf.disabled = true;
+                    document.getElementById('refund-schedule').innerHTML = '<option value="">—</option>';
+                    document.getElementById('refund-schedule').disabled = true;
+                    document.getElementById('refund-seat-grid').innerHTML = '<p class="msg" style="color:var(--text-secondary)">当前没有可退的已售票记录（请先售票）</p>';
+                } else {
+                    pf.disabled = false;
+                    pf.innerHTML = '<option value="">— 请选择电影 —</option>' +
+                        playsFiltered.map(p => `<option value="${p.id}">${p.id}-${escapeHtml(p.name)}</option>`).join('');
+                    if (prevP && [...pf.options].some(o => o.value === String(prevP))) pf.value = String(prevP);
+                    else pf.value = '';
+                    pf.onchange = () => {
+                        window._refundPlayFilterValue = pf.value;
+                        window._refundScheduleValue = '';
+                        refillRefundScheduleDropdown();
+                    };
+                    refillRefundScheduleDropdown();
+                }
+                document.getElementById('refund-msg').innerHTML = '';
+            } catch (e) {
+                document.getElementById('refund-msg').innerHTML = '<span class="err">加载失败</span>';
+            }
+        }
+
+        async function updateRefundGrid(schedules, studios) {
+            const playId = document.getElementById('refund-filter-play') && document.getElementById('refund-filter-play').value;
+            const sid = document.getElementById('refund-schedule').value;
+            const grid = document.getElementById('refund-seat-grid');
+            if (!playId) {
+                grid.innerHTML = '<p style="color:var(--text-secondary)">请先选择电影</p>';
+                return;
+            }
+            if (!sid) {
+                grid.innerHTML = '<p style="color:var(--text-secondary)">请选择该电影下的具体场次</p>';
+                return;
+            }
+            const sc = schedules.find(s => s.id == sid);
+            if (!sc) return;
+            const studio = studios.find(s => s.id === sc.studioID);
+            if (!studio) return grid.innerHTML = '演出厅不存在';
+            const [seats, tickets] = await Promise.all([
+                fetchWithAuth('/api/seats?room=' + sc.studioID),
+                fetchWithAuth('/api/tickets?schedule=' + encodeURIComponent(sid) + '&refund=1')
+            ]);
+            const refundableKeys = new Set();
+            (tickets || []).filter(t => t.status === 1).forEach(t => {
+                const seat = (seats || []).find(se => se.id === t.seatID);
+                if (seat) refundableKeys.add(seat.row + ',' + seat.col);
+            });
+            const seatMap = {};
+            seats.forEach(s => { seatMap[s.row + ',' + s.col] = s; });
+            let html = '<div class="grid-seat" style="grid-template-columns:repeat(' + (studio.cols + 1) + ',auto)">';
+            html += '<span></span>';
+            for (let c = 0; c < studio.cols; c++) html += '<span style="font-size:0.7rem">' + (c + 1) + '</span>';
+            for (let r = 0; r < studio.rows; r++) {
+                html += '<span style="font-size:0.7rem">' + (r + 1) + '</span>';
+                for (let c = 0; c < studio.cols; c++) {
+                    const key = r + ',' + c;
+                    const seat = seatMap[key];
+                    let cls = 'sell';
+                    let ch = '-';
+                    if (refundableKeys.has(key)) {
+                        cls = 'sold';
+                        ch = '#';
+                    } else if (seat && seat.status === 9) {
+                        cls = 'broken';
+                        ch = 'X';
+                    }
+                    html += '<span class="' + cls + '" data-row="' + r + '" data-col="' + c + '">' + ch + '</span>';
+                }
+            }
+            html += '</div>';
+            grid.innerHTML = html;
+            grid.querySelectorAll('span.sold').forEach(sp => {
+                sp.onclick = async () => {
+                    const row = parseInt(sp.dataset.row);
+                    const col = parseInt(sp.dataset.col);
+                    const res = await api('POST', '/api/refund', { scheduleID: parseInt(sid), row, col });
+                    const msg = document.getElementById('refund-msg');
+                    msg.innerHTML = res.ok ? '<span class="ok">' + res.msg + '</span>' : '<span class="err">' + res.msg + '</span>';
+                    if (res.ok) loadRefund();
+                };
+            });
+        }
+
+        async function doRefund() {
+            const pid = document.getElementById('refund-filter-play').value;
+            const sid = document.getElementById('refund-schedule').value;
+            const row = parseInt(document.getElementById('refund-row').value) - 1;
+            const col = parseInt(document.getElementById('refund-col').value) - 1;
+            const msg = document.getElementById('refund-msg');
+            if (!pid) return msg.innerHTML = '<span class="err">请先选择电影</span>';
+            if (!sid) return msg.innerHTML = '<span class="err">请选择场次</span>';
+            if (isNaN(row) || isNaN(col) || row < 0 || col < 0) return msg.innerHTML = '<span class="err">请输入有效行列</span>';
+            const res = await api('POST', '/api/refund', { scheduleID: parseInt(sid), row, col });
+            msg.innerHTML = res.ok ? '<span class="ok">' + res.msg + '</span>' : '<span class="err">' + res.msg + '</span>';
+            if (res.ok) loadRefund();
+        }
+
+        async function loadQuery() {
+            const el = document.getElementById('query-list');
+            const u = getCurrentUser();
+            const isAdmin = u && u.role === 0;
+            document.getElementById('q-add-schedule-form').style.display = isAdmin ? 'block' : 'none';
+            document.getElementById('q-select-schedule-form').style.display = isAdmin ? 'none' : 'block';
+            try {
+                const [plays, schedules, studios] = await Promise.all([
+                    fetchWithAuth('/api/plays'),
+                    fetchWithAuth('/api/schedules'),
+                    fetchWithAuth('/api/studios')
+                ]);
+                window._queryCache = { plays, schedules, studios, isAdmin };
+                if (isAdmin) {
+                    document.getElementById('q-play').innerHTML = '<option value="">选择剧目</option>' + (plays || []).map(p => `<option value="${p.id}">${p.id}-${escapeHtml(p.name)}</option>`).join('');
+                    const qPlayEl = document.getElementById('q-play');
+                    qPlayEl.onchange = () => updatePlayStudioBindHint('q-play', 'q-studio-bind-hint', studios || []);
+                    updatePlayStudioBindHint('q-play', 'q-studio-bind-hint', studios || []);
+                } else {
+                    const sel = document.getElementById('q-schedule-select');
+                    sel.innerHTML = '<option value="">请选择排期</option>' + schedulesPlayStudioBound(schedules || []).map(s => {
+                        const play = (plays || []).find(p => p.id === s.playID) || {};
+                        const studio = (studios || []).find(st => st.id === s.studioID) || {};
+                        return `<option value="${s.id}">${s.date} ${s.time} | ${play.name || '-'} | ${studio.name || '-'}（${s.playID}号厅）| ${s.price}元</option>`;
+                    }).join('');
+                    sel.onchange = () => showScheduleDetail(schedules, plays, studios);
+                }
+                let html = '<p><b>剧目:</b></p><table><tr><th>ID</th><th>名称</th><th>类型</th><th>时长</th></tr>';
+                (plays || []).forEach(p => html += `<tr><td>${p.id}</td><td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.type)}</td><td>${p.duration}min</td></tr>`);
+                html += '</table>';
+                if (isAdmin) {
+                    html += '<p style="margin-top:1rem"><b>排期（按电影查看）</b></p>';
+                    html += '<p class="msg" style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:0.5rem">请先选择电影，再查看该片的全部场次安排</p>';
+                    html += '<div class="form-row"><label>选择电影:</label><select id="q-admin-play-filter" style="min-width:240px"></select></div>';
+                    html += '<div id="q-admin-by-movie-panel" class="schedule-by-movie-panel"><h4 id="q-admin-by-movie-title"></h4><div id="q-admin-schedule-list" class="msg"></div></div>';
+                }
+                el.innerHTML = html;
+                if (isAdmin) {
+                    const qf = document.getElementById('q-admin-play-filter');
+                    const prevQ = qf && window._queryAdminPlayFilterValue;
+                    qf.innerHTML = '<option value="">— 请选择电影 —</option>' + (plays || []).map(p => `<option value="${p.id}">${p.id}-${escapeHtml(p.name)}</option>`).join('');
+                    if (prevQ && [...qf.options].some(o => o.value === String(prevQ))) qf.value = String(prevQ);
+                    qf.onchange = () => { window._queryAdminPlayFilterValue = qf.value; renderQueryAdminSchedules(); };
+                    renderQueryAdminSchedules();
+                }
+            } catch (e) {
+                el.innerHTML = '<span class="err">加载失败</span>';
+            }
+        }
+        function showScheduleDetail(schedules, plays, studios) {
+            const sid = document.getElementById('q-schedule-select').value;
+            const detail = document.getElementById('q-schedule-detail');
+            if (!sid) { detail.style.display = 'none'; return; }
+            const s = (schedules || []).find(x => x.id == sid);
+            if (!s) { detail.style.display = 'none'; return; }
+            const play = (plays || []).find(p => p.id === s.playID) || {};
+            const studio = (studios || []).find(st => st.id === s.studioID) || {};
+            detail.innerHTML = `<p><b>场次详情</b></p><p>剧目: ${play.name || '-'} | 演出厅: ${studio.name || '-'}</p><p>日期: ${s.date} | 时间: ${s.time} | 票价: ${s.price}元</p>`;
+            detail.style.display = 'block';
+        }
+
+        async function addSchedule() {
+            const playID = document.getElementById('q-play').value;
+            const studioID = parseInt(playID, 10);
+            const date = document.getElementById('q-date').value;
+            const time = document.getElementById('q-time').value;
+            const price = parseFloat(document.getElementById('q-price').value) || 88;
+            const msg = document.getElementById('schedule-msg');
+            if (!playID) return msg.innerHTML = '<span class="err">请选择剧目</span>';
+            const res = await api('POST', '/api/schedule', { action: 'add', playID: parseInt(playID, 10), studioID, date, time, price });
+            msg.innerHTML = res.ok ? '<span class="ok">' + res.msg + '</span>' : '<span class="err">' + res.msg + '</span>';
+            if (res.ok) loadQuery();
+        }
+
+        async function delSchedule(id) {
+            if (!confirm('确定删除该排期？')) return;
+            await api('DELETE', '/api/schedule/' + id);
+        }
+
+        async function loadRanking() {
+            const el = document.getElementById('ranking-list');
+            const u = getCurrentUser();
+            document.getElementById('ranking-hint').textContent = u && u.role !== 0 ? '(我的销售)' : '(全部)';
+            try {
+                const list = await fetchWithAuth('/api/ranking');
+                if (!Array.isArray(list)) return el.innerHTML = '<span class="err">' + (list.msg || '加载失败') + '</span>';
+                if (list.length === 0) return el.innerHTML = '暂无剧目数据';
+                el.innerHTML = '<table><tr><th>ID</th><th>剧目名称</th><th>售票总金额</th></tr>' +
+                    list.map(p => `<tr><td>${p.id}</td><td>${p.name}</td><td>${p.totalAmount.toFixed(2)}</td></tr>`).join('') + '</table>';
+            } catch (e) {
+                el.innerHTML = '<span class="err">加载失败</span>';
+            }
+        }
+
+        async function loadAccounts() {
+            const el = document.getElementById('account-list');
+            const u = getCurrentUser();
+            const isAdmin = u && u.role === 0;
+            document.getElementById('account-add-form').style.display = isAdmin ? 'block' : 'none';
+            document.getElementById('account-self-form').style.display = isAdmin ? 'none' : 'block';
+            try {
+                const list = await api('GET', '/api/accounts');
+                if (!Array.isArray(list)) return el.innerHTML = '<span class="err">' + (list.msg || '加载失败') + '</span>';
+                if (list.length === 0) return el.innerHTML = '暂无账户数据';
+                el.innerHTML = '<table><tr><th>ID</th><th>用户名</th>' + (isAdmin ? '<th>密码</th>' : '') + '<th>角色</th><th>操作</th></tr>' +
+                    list.map(a => `<tr><td>${a.id}</td><td>${a.username}</td>` + (isAdmin ? `<td>${a.password || '-'}</td>` : '') + `<td>${a.role === 0 ? '管理员' : '普通用户'}</td><td>
+                        ${isAdmin && a.id !== u.id && a.username !== 'admin' ? `<button class="small danger" onclick="delAccount(${a.id})">删除</button>` : '-'}</td></tr>`).join('') + '</table>';
+            } catch (e) {
+                el.innerHTML = '<span class="err">加载失败</span>';
+            }
+        }
+
+        async function updateSelfPassword() {
+            const pwd = document.getElementById('self-password').value.trim();
+            const msg = document.getElementById('account-self-msg');
+            if (pwd.length < 6) return msg.innerHTML = '<span class="err">密码至少6位</span>';
+            const u = getCurrentUser();
+            if (!u) return;
+            const res = await api('POST', '/api/account', { action: 'update', id: u.id, password: pwd });
+            msg.innerHTML = res.ok ? '<span class="ok">' + res.msg + '</span>' : '<span class="err">' + res.msg + '</span>';
+            if (res.ok) document.getElementById('self-password').value = '';
+        }
+
+        async function addAccount() {
+            const username = document.getElementById('a-username').value.trim();
+            const password = document.getElementById('a-password').value;
+            const role = parseInt(document.getElementById('a-role').value);
+            const msg = document.getElementById('account-msg');
+            if (!username || !password) return msg.innerHTML = '<span class="err">用户名和密码不能为空</span>';
+            const res = await api('POST', '/api/account', { action: 'add', username, password, role });
+            msg.innerHTML = res.ok ? '<span class="ok">' + res.msg + '</span>' : '<span class="err">' + res.msg + '</span>';
+            if (res.ok) { document.getElementById('a-username').value = ''; document.getElementById('a-password').value = ''; loadAccounts(); }
+        }
+
+        async function delAccount(id) {
+            if (!confirm('确定删除该账户？')) return;
+            const res = await api('DELETE', '/api/account/' + id);
+            document.getElementById('account-msg').innerHTML = res.ok ? '<span class="ok">' + res.msg + '</span>' : '<span class="err">' + (res.msg || '失败') + '</span>';
+            if (res.ok) loadAccounts();
+        }
+
+        menuItems.forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (this.dataset.key === 'INIT') {
+                    initAllData();
+                    return;
+                }
+                showPanel(this.dataset.key);
+            });
+        });
+
+        async function initAllData() {
+            if (!confirm('确定要初始化所有数据吗？此操作将清空演出厅、剧目、排期、票务等所有数据，仅保留管理员账户。此操作不可恢复！')) return;
+            try {
+                const res = await api('POST', '/api/init-all', {});
+                console.log('[init-all] 服務端回應:', res);
+                alert(res.ok ? res.msg : (res.msg || '初始化失败'));
+                if (res.ok) showPanel('SCH');
+            } catch (e) {
+                console.error('[init-all] 請求異常:', e);
+                alert('初始化失败：' + (e.message || '网络错误'));
+            }
+        }
+
+        if (checkAuth()) {
+            const u = getCurrentUser();
+            showPanel((u && u.role === 0) ? 'SCH' : 'T');
+        }
+    </script>
+</body>
+</html>
